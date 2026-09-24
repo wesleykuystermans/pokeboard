@@ -2,25 +2,26 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pokéboard v0.8</title>
+<title>Pokéboard v0.9</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f3f1e9;color:#222;font-family:system-ui,sans-serif}main{max-width:1050px;margin:auto;padding:16px}
 .panel{background:#fff;border:1px solid #ccc;border-radius:12px;padding:14px;margin:0 0 12px}.hidden{display:none}
-.board{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}.tile{min-height:76px;padding:7px;border:1px solid #bbb;border-radius:9px;background:#fafafa;text-align:left}.valid{outline:3px solid #1976d2}.gym{box-shadow:inset 0 0 0 2px #d59b00}
+.board{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}.tile{min-width:0;min-height:76px;padding:7px;border:1px solid #bbb;border-radius:9px;background:#fafafa;text-align:left;overflow-wrap:anywhere}.valid{outline:3px solid #1976d2}.gym{box-shadow:inset 0 0 0 2px #d59b00}.here{background:#e8f3ff}.type-short{display:none}
 .pawn{display:inline-block;padding:3px 7px;margin:2px;border-radius:50%;background:#ddd;font-weight:700}.actions{display:flex;gap:7px;flex-wrap:wrap}
 .cards{display:flex;gap:7px;overflow:auto;padding:3px}.card{min-width:125px;padding:9px;border:1px solid #bbb;border-radius:9px;background:#fff;text-align:left}.selected{outline:3px solid #1976d2}
 button,select,input{font:inherit;padding:9px;border:1px solid #aaa;border-radius:8px}button{cursor:pointer}button:disabled{opacity:.4;cursor:not-allowed}.small{font-size:12px;color:#666}.log{max-height:240px;overflow:auto;font-size:14px}
-@media(max-width:650px){.board{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:650px){main{padding:8px}.panel{padding:9px}.board{gap:3px}.tile{min-height:64px;padding:3px;border-radius:5px;font-size:11px}.type-full{display:none}.type-short{display:inline}.pawn{padding:2px 4px;margin:1px;font-size:10px}}
 </style></head>
 <body><main>
-<section id="setup" class="panel"><h2>Pokéboard v0.8</h2><p>Playtest met terreinbonus: vecht je met een Pokémon op een zone van zijn eigen type, dan krijgt hij ×2.</p>
+<section id="setup" class="panel"><h2>Pokéboard v0.9</h2><p>Op een zone van het type van je Pokémon krijgt die in een gevecht ×2. Start-Pokémon worden willekeurig verdeeld.</p>
 <label>Aantal spelers <select id="count"><option>2</option><option>3</option><option>4</option></select></label><div id="players"></div><p><button id="start">Start spel</button></p></section>
 <section id="game" class="hidden">
 <div class="panel"><strong id="turn"></strong><div id="phase" class="small"></div><div id="stats"></div></div>
 <div class="panel"><div class="actions"><button id="roll">🎲 Dobbel</button><button id="wild">⚔️ Wilde battle</button><button id="gym">🏅 Gym</button><button id="shop">🛒 Shop</button><button id="end">⏹ Beurt beëindigen</button></div><br><div id="board" class="board"></div></div>
 <div class="panel"><strong>Hand</strong><div id="hand" class="cards"></div></div>
+<div class="panel"><strong>Evolutie</strong><div class="small">Wissel twee identieke Pokémonkaarten uit je verzameling om voor hun evolutie.</div><div id="evolutions" class="actions"></div></div>
 <div class="panel"><strong>Open Pokémon</strong><div class="small">Klik om te vangen als je op een overeenkomstige type-zone staat.</div><div id="market" class="cards"></div></div>
-<div id="shopPanel" class="panel hidden"><strong>Poké Mart</strong><div class="actions"><button data-buy="Copper">Copper → Red Ball</button><button data-buy="Silver">Silver → Blue Ball</button><button data-buy="Gold">Gold → Yellow Ball</button></div></div>
+<div id="shopPanel" class="panel hidden"><strong>Poké Mart</strong><div class="small">Ruil munten uit je verzameling; koop ballen met munten in je hand.</div><div class="actions"><button data-exchange="Copper">3 Copper → 1 Silver</button><button data-exchange="Silver">2 Silver → 1 Gold</button></div><br><div class="actions"><button data-buy="Copper">Copper → Red Ball</button><button data-buy="Silver">Silver → Blue Ball</button><button data-buy="Gold">Gold → Yellow Ball</button></div></div>
 <div class="panel"><strong>Spelverloop</strong><div id="log" class="log"></div></div>
 </section>
 </main>
@@ -31,12 +32,17 @@ const $=s=>document.querySelector(s);
 const TYPES=["Normal","Fire","Water","Grass","Electric","Ice","Fighting","Poison","Ground","Flying","Psychic","Bug","Rock","Ghost","Dragon"];
 const GYMS=new Set([0,5,7,10,12,17]);
 const RAW=[
-["Caterpie",["Bug"],18],["Pidgey",["Normal","Flying"],24],["Rattata",["Normal"],25],["Zubat",["Poison","Flying"],27],["Geodude",["Rock","Ground"],31],["Oddish",["Grass","Poison"],32],["Poliwag",["Water"],30],["Vulpix",["Fire"],33],
-["Pikachu",["Electric"],45],["Psyduck",["Water"],43],["Growlithe",["Fire"],48],["Cubone",["Ground"],44],["Drowzee",["Psychic"],46],["Onix",["Rock","Ground"],50],["Haunter",["Ghost","Poison"],55],["Machoke",["Fighting"],56],["Seel",["Water","Ice"],52],
-["Charizard",["Fire","Flying"],88],["Blastoise",["Water"],88],["Venusaur",["Grass","Poison"],88],["Alakazam",["Psychic"],82],["Gengar",["Ghost","Poison"],84],["Dragonite",["Dragon","Flying"],96],["Lapras",["Water","Ice"],80]
+["Bulbasaur",["Grass","Poison"],30],["Charmander",["Fire"],30],["Squirtle",["Water"],30],
+["Caterpie",["Bug"],18],["Pidgey",["Normal","Flying"],24],["Rattata",["Normal"],25],["Zubat",["Poison","Flying"],27],["Geodude",["Rock","Ground"],31],["Oddish",["Grass","Poison"],32],["Poliwag",["Water"],30],["Vulpix",["Fire"],33],["Abra",["Psychic"],28],["Gastly",["Ghost","Poison"],31],["Machop",["Fighting"],29],["Dratini",["Dragon"],33],["Eevee",["Normal"],32],["Magikarp",["Water"],15],["Nidoran♀",["Poison"],26],["Sandshrew",["Ground"],30],["Bellsprout",["Grass","Poison"],27],
+["Pikachu",["Electric"],45],["Psyduck",["Water"],43],["Growlithe",["Fire"],48],["Cubone",["Ground"],44],["Drowzee",["Psychic"],46],["Onix",["Rock","Ground"],50],["Haunter",["Ghost","Poison"],55],["Machoke",["Fighting"],56],["Seel",["Water","Ice"],52],["Ivysaur",["Grass","Poison"],55],["Charmeleon",["Fire"],55],["Wartortle",["Water"],55],["Metapod",["Bug"],40],["Pidgeotto",["Normal","Flying"],49],["Gloom",["Grass","Poison"],50],["Kadabra",["Psychic"],55],["Dragonair",["Dragon"],60],["Graveler",["Rock","Ground"],54],["Poliwhirl",["Water"],51],["Nidorina",["Poison"],49],["Sandslash",["Ground"],62],["Weepinbell",["Grass","Poison"],51],["Raichu",["Electric"],64],
+["Charizard",["Fire","Flying"],88],["Blastoise",["Water"],88],["Venusaur",["Grass","Poison"],88],["Alakazam",["Psychic"],82],["Gengar",["Ghost","Poison"],84],["Dragonite",["Dragon","Flying"],96],["Lapras",["Water","Ice"],80],["Butterfree",["Bug","Flying"],74],["Pidgeot",["Normal","Flying"],76],["Vileplume",["Grass","Poison"],78],["Golem",["Rock","Ground"],82],["Poliwrath",["Water","Fighting"],80],["Nidoqueen",["Poison","Ground"],84],["Victreebel",["Grass","Poison"],78],["Gyarados",["Water","Flying"],89],["Arcanine",["Fire"],83],["Ninetales",["Fire"],77],["Machamp",["Fighting"],85],["Raticate",["Normal"],48],["Golbat",["Poison","Flying"],54],["Golduck",["Water"],70],["Marowak",["Ground"],72],["Hypno",["Psychic"],72],["Dewgong",["Water","Ice"],76],["Flareon",["Fire"],77]
 ];
+const EVOLVE={Bulbasaur:"Ivysaur",Ivysaur:"Venusaur",Charmander:"Charmeleon",Charmeleon:"Charizard",Squirtle:"Wartortle",Wartortle:"Blastoise",Caterpie:"Metapod",Metapod:"Butterfree",Pidgey:"Pidgeotto",Pidgeotto:"Pidgeot",Rattata:"Raticate",Zubat:"Golbat",Oddish:"Gloom",Gloom:"Vileplume",Abra:"Kadabra",Kadabra:"Alakazam",Gastly:"Haunter",Haunter:"Gengar",Machop:"Machoke",Machoke:"Machamp",Dratini:"Dragonair",Dragonair:"Dragonite",Geodude:"Graveler",Graveler:"Golem",Poliwag:"Poliwhirl",Poliwhirl:"Poliwrath","Nidoran♀":"Nidorina",Nidorina:"Nidoqueen",Sandshrew:"Sandslash",Bellsprout:"Weepinbell",Weepinbell:"Victreebel",Pikachu:"Raichu",Magikarp:"Gyarados",Growlithe:"Arcanine",Vulpix:"Ninetales",Psyduck:"Golduck",Cubone:"Marowak",Drowzee:"Hypno",Seel:"Dewgong",Eevee:"Flareon"};
 const ADV={Fire:["Grass","Bug","Ice"],Water:["Fire","Rock","Ground"],Grass:["Water","Ground","Rock"],Electric:["Water","Flying"],Ice:["Grass","Ground","Flying","Dragon"],Fighting:["Normal","Rock","Ice"],Poison:["Grass","Bug"],Ground:["Fire","Electric","Poison","Rock"],Flying:["Grass","Fighting","Bug"],Psychic:["Fighting","Poison"],Bug:["Grass","Psychic","Poison"],Rock:["Fire","Ice","Flying","Bug"],Ghost:["Ghost","Psychic"],Dragon:["Dragon"],Normal:[]};
 const POKE=RAW.map((x,i)=>({id:"p"+i,name:x[0],types:x[1],score:x[2],rarity:x[2]<=33?"Common":x[2]<=66?"Medium":"Rare",kind:"pokemon"}));
+const BY_NAME=Object.fromEntries(POKE.map(p=>[p.name,p]));
+const BALL_ORDER={"Red Ball":0,"Blue Ball":1,"Yellow Ball":2};
+const SHORT={Normal:"Norm",Fire:"Fire",Water:"Water",Grass:"Grass",Electric:"Elec",Ice:"Ice",Fighting:"Fight",Poison:"Pois",Ground:"Grnd",Flying:"Fly",Psychic:"Psych",Bug:"Bug",Rock:"Rock",Ghost:"Ghost",Dragon:"Drgn"};
 let S=null;
 function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1)),t=a[i];a[i]=a[j];a[j]=t}return a}
 function card(name,kind,extra){return Object.assign({id:Math.random().toString(36).slice(2),name,kind},extra||{})}
@@ -45,16 +51,34 @@ const current=()=>S.players[S.current];
 function xy(i){return [Math.floor(i/6),i%6]} function distance(a,b){let A=xy(a),B=xy(b);return Math.abs(A[0]-B[0])+Math.abs(A[1]-B[1])}
 function hasPokemon(p){return p.hand.some(c=>c.kind==="pokemon")}
 function canCatch(b,r){return b==="Yellow Ball"||(b==="Blue Ball"&&r!=="Rare")||(b==="Red Ball"&&r==="Common")}
+function owned(p){return [...p.hand,...p.deck,...p.discard]}
+function countOwned(p,name,kind){return owned(p).filter(c=>c.kind===kind&&c.name===name).length}
+function takeOwned(p,name,kind,n){
+ if(countOwned(p,name,kind)<n)return false;
+ for(let pile of [p.hand,p.discard,p.deck])for(let i=pile.length-1;i>=0&&n;i--)if(pile[i].kind===kind&&pile[i].name===name){pile.splice(i,1);n--}
+ S.selected=null;return true;
+}
+function evolve(name,p){
+ p=p||current();let next=EVOLVE[name];if(!next||!BY_NAME[next]||!takeOwned(p,name,"pokemon",2))return false;
+ p.hand.push(card(next,"pokemon",{types:BY_NAME[next].types,score:BY_NAME[next].score,rarity:BY_NAME[next].rarity}));
+ log("✨ "+p.name+" evolueert 2 × "+name+" tot "+next+".");render();return true;
+}
+function exchange(from,p){
+ p=p||current();let n=from==="Copper"?3:from==="Silver"?2:0,to=from==="Copper"?"Silver":"Gold";
+ if(!n||!takeOwned(p,from,"coin",n))return false;
+ p.hand.push(coin(to));log("🪙 "+p.name+" wisselt "+n+" "+from+" om voor 1 "+to+".");render();return true;
+}
 function log(s){let d=document.createElement("div");d.textContent=s;$("#log").prepend(d)}
 function setupRows(){let n=Number($("#count").value),box=$("#players");box.innerHTML="";for(let i=0;i<n;i++){let row=document.createElement("div");row.style.marginTop="8px";row.innerHTML='<input value="'+(i===0?"Wes":"Trainer "+(i+1))+'"> <select><option value="human">Mens</option><option value="ai" '+(i>0?"selected":"")+'>AI</option></select>';box.appendChild(row)}}
 function drawToFive(p){while(p.hand.length<5){if(!p.deck.length){p.deck=shuffle(p.discard);p.discard=[]}if(!p.deck.length)break;p.hand.push(p.deck.pop())}}
-function refill(){while(S.market.length<5&&S.wild.length)S.market.push(S.wild.pop())}
+function nextWild(){if(!S.wild.length)S.wild=shuffle(S.wildPool);return Object.assign({},S.wild.pop(),{id:"wild"+Math.random()})}
+function refill(){while(S.market.length<5)S.market.push(nextWild())}
 function start(){
  let defs=Array.from($("#players").children).map(r=>({name:r.querySelector("input").value.trim()||"Trainer",ai:r.querySelector("select").value==="ai"}));
  let board=shuffle(TYPES.flatMap(t=>[t,t,t])).slice(0,18), present=new Set(board);
- let wild=shuffle(POKE.filter(p=>p.types.some(t=>present.has(t))).flatMap(p=>Array.from({length:p.rarity==="Common"?3:p.rarity==="Medium"?2:1},()=>Object.assign({},p,{id:p.id+Math.random()}))));
- let starters=[["Bulbasaur",["Grass","Poison"]],["Charmander",["Fire"]],["Squirtle",["Water"]],["Pikachu",["Electric"]]];
- S={board,wild,market:[],players:defs.map((d,i)=>{let st=card(starters[i][0],"pokemon",{types:starters[i][1],score:30,rarity:"Common"});return Object.assign(d,{pos:[6,11,1,16][i],deck:shuffle([ball("Red Ball"),ball("Red Ball"),ball("Red Ball"),st]),discard:[],hand:[],badges:0})}),current:0,phase:"move",roll:0,selected:null,battled:false,captured:false};
+ let wildPool=POKE.filter(p=>p.types.some(t=>present.has(t))).flatMap(p=>Array(p.rarity==="Common"?3:p.rarity==="Medium"?2:1).fill(p));
+ let starters=shuffle(["Bulbasaur","Charmander","Squirtle"]);
+ S={board,wild:[],wildPool,market:[],players:defs.map((d,i)=>{let base=BY_NAME[starters[i%3]],st=card(base.name,"pokemon",{types:base.types,score:base.score,rarity:base.rarity});return Object.assign(d,{pos:[6,11,1,16][i],deck:shuffle([ball("Red Ball"),ball("Red Ball"),ball("Red Ball"),st]),discard:[],hand:[],badges:0})}),current:0,phase:"move",roll:0,selected:null,battled:false,captured:false};
  refill();$("#setup").classList.add("hidden");$("#game").classList.remove("hidden");$("#log").innerHTML="";begin();
 }
 function begin(){let p=current();S.phase="move";S.roll=0;S.selected=null;S.battled=false;S.captured=false;drawToFive(p);log("▶ "+p.name+(p.ai?" [AI]":"")+" begint.");render();if(p.ai)setTimeout(aiTurn,400)}
@@ -68,7 +92,7 @@ function combatPower(pk,foe,playerPokemon){
 }
 function chosenIndex(p){if(p===current()&&S.selected!==null&&p.hand[S.selected]&&p.hand[S.selected].kind==="pokemon")return S.selected;let best=-1,score=-1;p.hand.forEach((c,i)=>{if(c.kind==="pokemon"&&c.score>score){best=i;score=c.score}});return best}
 function battle(gym,p){
- p=p||current();let pi=chosenIndex(p);if(pi<0)return false;let foe=S.wild.pop();if(!foe){log("Geen wilde Pokémon meer.");return false}
+ p=p||current();let pi=chosenIndex(p);if(pi<0)return false;let foe=nextWild();
  let mine=p.hand.splice(pi,1)[0];p.discard.push(mine);S.selected=null;S.battled=true;
  let a=combatPower(mine,foe,true), f=combatPower(foe,mine,false), foePower=f.value*(gym?2:1);
  let reason=a.terrain===2?"zonebonus "+S.board[p.pos]+" ×2":a.type===2?"typevoordeel ×2":a.type===.5?"typenadeel ×½":"neutraal";
@@ -76,7 +100,7 @@ function battle(gym,p){
  if(a.value>=foePower){if(gym){p.badges++;p.discard.push(card("Badge","badge"));log("🏅 "+p.name+" wint een Badge.")}else{let r=foe.rarity==="Common"?"Copper":foe.rarity==="Medium"?"Silver":"Gold";p.discard.push(coin(r));log("🏆 "+p.name+" wint een "+r+" Coin.")}}else log("💥 "+p.name+" verliest.");
  render();return true;
 }
-function capture(i,p){p=p||current();let pk=S.market[i];if(!pk||!pk.types.includes(S.board[p.pos]))return false;let bi=p.hand.findIndex(c=>c.kind==="ball"&&canCatch(c.name,pk.rarity));if(bi<0)return false;let used=p.hand.splice(bi,1)[0];p.discard.push(Object.assign({},pk,{id:"caught"+Math.random()}));S.market.splice(i,1);S.captured=true;refill();log("✨ "+p.name+" vangt "+pk.name+" met "+used.name+".");render();return true}
+function capture(i,p){p=p||current();let pk=S.market[i];if(!pk||!pk.types.includes(S.board[p.pos]))return false;let bi=-1;for(let j=0;j<p.hand.length;j++)if(p.hand[j].kind==="ball"&&canCatch(p.hand[j].name,pk.rarity)&&(bi<0||BALL_ORDER[p.hand[j].name]<BALL_ORDER[p.hand[bi].name]))bi=j;if(bi<0)return false;let used=p.hand.splice(bi,1)[0];p.discard.push(Object.assign({},pk,{id:"caught"+Math.random()}));S.market.splice(i,1);S.captured=true;refill();log("✨ "+p.name+" vangt "+pk.name+" met "+used.name+".");render();return true}
 function buy(k,p){p=p||current();let i=p.hand.findIndex(c=>c.kind==="coin"&&c.name===k);if(i<0)return false;p.hand.splice(i,1);let b=k==="Copper"?"Red Ball":k==="Silver"?"Blue Ball":"Yellow Ball";p.discard.push(ball(b));log("🛒 "+p.name+" koopt "+b+".");render();return true}
 function finish(){if(!S||!["action","shop"].includes(S.phase))return;let p=current();p.discard.push(...p.hand);p.hand=[];log("⏹ "+p.name+" beëindigt de beurt.");S.current=(S.current+1)%S.players.length;begin()}
 function aiTurn(){
@@ -85,24 +109,32 @@ function aiTurn(){
  function score(i){let z=S.board[i],s=Math.random();if(S.market.some(pk=>pk.types.includes(z)&&p.hand.some(c=>c.kind==="ball"&&canCatch(c.name,pk.rarity))))s+=10;if(GYMS.has(i)&&hasPokemon(p))s+=4;return s}
  ds.sort((a,b)=>score(b)-score(a));if(ds.length)p.pos=ds[0];S.phase="action";log("📍 "+p.name+" [AI] → "+S.board[p.pos]+".");
  let mi=S.market.findIndex(pk=>pk.types.includes(S.board[p.pos])&&p.hand.some(c=>c.kind==="ball"&&canCatch(c.name,pk.rarity)));if(mi>=0)capture(mi,p);
- if(hasPokemon(p))battle(GYMS.has(p.pos),p);for(let k of ["Gold","Silver","Copper"])while(buy(k,p)){}
+ for(let name of Object.keys(EVOLVE))while(countOwned(p,name,"pokemon")>=2)evolve(name,p);
+ if(hasPokemon(p))battle(GYMS.has(p.pos),p);
+ while(countOwned(p,"Copper","coin")>=3)exchange("Copper",p);
+ while(countOwned(p,"Silver","coin")>=2)exchange("Silver",p);
+ for(let k of ["Gold","Silver","Copper"])while(buy(k,p)){}
  setTimeout(finish,500);
 }
 function render(){
  let p=current();$("#turn").textContent=p.name+(p.ai?" — AI":"")+" aan zet";$("#phase").textContent={move:"Dobbel om te bewegen.",destination:"Klik rechtstreeks op een geldige eindbestemming.",action:"Vang, battle, shop of beëindig je beurt.",shop:"Poké Mart."}[S.phase]||"";
  $("#stats").textContent=S.players.map(x=>x.name+" 🏅"+x.badges).join(" · ");
- let board=$("#board");board.innerHTML="";S.board.forEach((t,i)=>{let valid=!p.ai&&S.phase==="destination"&&distance(p.pos,i)>=1&&distance(p.pos,i)<=S.roll,b=document.createElement("button");b.type="button";b.className="tile "+(valid?"valid ":"")+(GYMS.has(i)?"gym":"");b.disabled=!valid;b.dataset.tile=i;b.innerHTML="<b>"+t+"</b><br>"+S.players.map((x,j)=>x.pos===i?'<span class="pawn">'+(j+1)+"</span>":"").join("");board.appendChild(b)});
+ let board=$("#board");board.innerHTML="";S.board.forEach((t,i)=>{let valid=!p.ai&&S.phase==="destination"&&distance(p.pos,i)>=1&&distance(p.pos,i)<=S.roll,b=document.createElement("button");b.type="button";b.className="tile "+(valid?"valid ":"")+(GYMS.has(i)?"gym ":"")+(p.pos===i?"here":"");b.disabled=!valid;b.dataset.tile=i;b.setAttribute("aria-label",t+", rij "+(Math.floor(i/6)+1)+", kolom "+(i%6+1)+(GYMS.has(i)?", gym":""));b.innerHTML='<b class="type-full">'+t+'</b><b class="type-short">'+SHORT[t]+"</b><br>"+S.players.map((x,j)=>x.pos===i?'<span class="pawn">'+(j+1)+"</span>":"").join("");board.appendChild(b)});
  let hand=$("#hand");hand.innerHTML="";p.hand.forEach((c,i)=>{let b=document.createElement("button");b.type="button";b.className="card "+(S.selected===i?"selected":"");b.disabled=p.ai||c.kind!=="pokemon";b.dataset.hand=i;b.innerHTML="<b>"+c.name+"</b><br><span class=small>"+(c.kind==="pokemon"?c.types.join("/")+" · "+c.score+" · "+c.rarity:c.kind)+"</span>";hand.appendChild(b)});
  let market=$("#market");market.innerHTML="";S.market.forEach((pk,i)=>{let b=document.createElement("button");b.type="button";b.className="card";b.disabled=p.ai||S.phase!=="action"||S.captured;b.dataset.market=i;b.innerHTML="<b>"+pk.name+"</b><br><span class=small>"+pk.types.join("/")+" · "+pk.rarity+" · "+pk.score+"</span>";market.appendChild(b)});
+ let evolutions=$("#evolutions");evolutions.innerHTML="";for(let name of Object.keys(EVOLVE))if(countOwned(p,name,"pokemon")>=2){let b=document.createElement("button");b.type="button";b.dataset.evolve=name;b.textContent="2 × "+name+" → "+EVOLVE[name];b.disabled=p.ai||!["action","shop"].includes(S.phase);evolutions.appendChild(b)}if(!evolutions.children.length)evolutions.textContent="Nog geen dubbel paar beschikbaar.";
  let human=!p.ai;$("#roll").disabled=!human||S.phase!=="move";$("#wild").disabled=!human||S.phase!=="action"||S.battled||!hasPokemon(p);$("#gym").disabled=!human||S.phase!=="action"||S.battled||!hasPokemon(p)||!GYMS.has(p.pos);$("#shop").disabled=!human||S.phase!=="action";$("#end").disabled=!human||!["action","shop"].includes(S.phase);$("#shopPanel").classList.toggle("hidden",S.phase!=="shop");
+ for(let b of $("#shopPanel").querySelectorAll("[data-exchange]"))b.disabled=!human||S.phase!=="shop"||countOwned(p,b.dataset.exchange,"coin")<(b.dataset.exchange==="Copper"?3:2);
+ for(let b of $("#shopPanel").querySelectorAll("[data-buy]"))b.disabled=!human||S.phase!=="shop"||!p.hand.some(c=>c.kind==="coin"&&c.name===b.dataset.buy);
 }
 $("#count").addEventListener("change",setupRows);$("#start").addEventListener("click",start);
 $("#roll").addEventListener("click",()=>{S.roll=1+Math.floor(Math.random()*6);S.phase="destination";log("🎲 "+current().name+" gooit "+S.roll+".");render()});
 $("#board").addEventListener("click",e=>{let b=e.target.closest("[data-tile]");if(!b)return;let i=Number(b.dataset.tile);if(S.phase==="destination"&&distance(current().pos,i)>=1&&distance(current().pos,i)<=S.roll){current().pos=i;S.phase="action";log("📍 "+current().name+" → "+S.board[i]+".");render()}});
 $("#hand").addEventListener("click",e=>{let b=e.target.closest("[data-hand]");if(b){S.selected=Number(b.dataset.hand);render()}});
 $("#market").addEventListener("click",e=>{let b=e.target.closest("[data-market]");if(b)capture(Number(b.dataset.market))});
+$("#evolutions").addEventListener("click",e=>{let b=e.target.closest("[data-evolve]");if(b&&!b.disabled&&["action","shop"].includes(S.phase))evolve(b.dataset.evolve)});
 $("#wild").addEventListener("click",()=>battle(false));$("#gym").addEventListener("click",()=>battle(true));$("#shop").addEventListener("click",()=>{S.phase="shop";render()});$("#end").addEventListener("click",finish);
-$("#shopPanel").addEventListener("click",e=>{let b=e.target.closest("[data-buy]");if(b)buy(b.dataset.buy)});
+$("#shopPanel").addEventListener("click",e=>{let b=e.target.closest("[data-buy], [data-exchange]");if(b&&!b.disabled&&S.phase==="shop"){if(b.dataset.buy)buy(b.dataset.buy);else exchange(b.dataset.exchange)}});
 setupRows();
 })();
 </script></body></html>
