@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Pokéboard v0.14</title>
+<title>Pokéboard v0.15</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#f3f1e9;color:#222;font-family:system-ui,sans-serif}main{max-width:1050px;margin:auto;padding:16px}
 .panel{background:#fff;border:1px solid #ccc;border-radius:12px;padding:14px;margin:0 0 12px}.hidden{display:none}
@@ -23,15 +23,15 @@ button,select,input{font:inherit;padding:9px;border:1px solid #aaa;border-radius
 .generation-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;margin:10px 0}.generation-option{display:flex;align-items:center;gap:6px;padding:8px;border:1px solid #b9c7b8;border-radius:8px;background:#f4f7ef;font-weight:650;cursor:pointer}.generation-option:has(input:checked){border-color:#348252;background:#def3e2}.generation-option input{margin:0;accent-color:#267a42}.generation-tools{display:flex;gap:7px;flex-wrap:wrap}.generation-hint{margin:6px 0;color:#426149;font-size:13px}@media(max-width:650px){.generation-grid{gap:4px}.generation-option{font-size:12px;padding:6px 4px}}
 </style></head>
 <body><main>
-<section id="setup" class="panel"><h2>Pokéboard v0.14</h2><p>Win één badge in elk van de zes gyms. Wie als eerste alle zes badges heeft, wint. Het terrein wordt willekeurig getrokken: ontbreekt een type, dan verschijnen Pokémon van uitsluitend dat type niet in dit spel.</p>
+<section id="setup" class="panel"><h2>Pokéboard v0.15</h2><p>Win één badge in elk van de zes gyms. Wie als eerste alle zes badges heeft, wint. Het terrein wordt willekeurig getrokken: ontbreekt een type, dan verschijnen Pokémon van uitsluitend dat type niet in dit spel.</p>
 <strong>Kies de generaties</strong><div id="generations" class="generation-grid"></div><div class="generation-tools"><button id="selectAllGenerations" type="button">Alle generaties</button><button id="selectFirstGeneration" type="button">Alleen generatie I</button></div><div id="generationHint" class="generation-hint" role="status"></div>
 <label>Aantal spelers <select id="count"><option>2</option><option>3</option><option>4</option></select></label><div id="players"></div><p><button id="start">Start spel</button></p></section>
 <section id="game" class="hidden">
 <div class="panel"><strong id="turn"></strong><div id="phase" class="small"></div><div id="stats"></div></div>
 <div id="victory" class="panel hidden" role="status"></div>
-<div class="panel"><div class="actions"><button id="roll">🎲 Dobbel</button><button id="wild">⚔️ Wilde battle</button><button id="gym">🏅 Gym</button><button id="duel">🥊 Trainerduel</button><button id="shop">🛒 Shop</button><button id="end">⏹ Beurt beëindigen</button></div><br><div id="board" class="board"></div></div>
+<div class="panel"><div class="actions"><button id="roll">🎲 Dobbel</button><button id="wild">⚔️ Wilde battle</button><button id="gym">🏅 Gym</button><button id="duel">🥊 Trainerduel</button><button id="shop">🛒 Shop</button><button id="end">⏹ Beurt beëindigen</button></div><div id="duelStatus" class="small" role="status"></div><br><div id="board" class="board"></div></div>
 <div id="duelPanel" class="panel hidden"><strong>Trainerduel</strong><div id="duelPrompt" class="small"></div><div id="duelChoices" class="actions"></div><p><button id="duelCancel">Duel annuleren</button></p></div>
-<div class="panel"><strong>Hand</strong><div class="small">Selecteer een Pokémon vóór een duel; zonder selectie speelt je sterkste Pokémon.</div><div id="hand" class="cards"></div></div>
+<div class="panel"><strong>Hand</strong><div class="small">Wilde battle: gewoon → koper, middelzeldzaam of zeldzaam → zilver. Voor een trainerduel: land op hetzelfde vakje als een trainer die een Pokémon in zijn hand heeft. Selecteer vooraf je Pokémon; anders speelt je sterkste.</div><div id="hand" class="cards"></div></div>
 <div class="panel"><strong>Evolutie</strong><div class="small">Wissel twee identieke Pokémonkaarten uit je verzameling om voor hun evolutie.</div><div id="evolutions" class="actions"></div></div>
 <div class="panel"><strong>Open Pokémon</strong><div class="small">Klik om te vangen als je op een overeenkomstige type-zone staat.</div><div id="market" class="cards"></div></div>
 <div id="shopPanel" class="panel hidden"><strong>Poké Mart</strong><div class="small">Ruil alleen munten in je hand. De nieuwe munt komt op je aflegstapel en kan pas in een latere beurt worden gebruikt.</div><div class="actions"><button data-exchange="Copper">3 Copper → 1 Silver</button><button data-exchange="Silver">2 Silver → 1 Gold</button></div><br><div class="actions"><button data-buy="Copper">Copper → Red Ball</button><button data-buy="Silver">Silver → Blue Ball</button><button data-buy="Gold">Gold → Yellow Ball</button></div></div>
@@ -260,8 +260,8 @@ function start(){
  let board=shuffle(TYPES.filter(t=>availableTypes.has(t)).flatMap(t=>[t,t,t])).slice(0,18),present=new Set(board);
  let wildPool=available.filter(p=>p.types.some(t=>present.has(t))).flatMap(p=>Array(p.rarity==="Common"?3:p.rarity==="Medium"?2:1).fill(p));
  let starters=shuffle(Array.from(generations).flatMap(g=>STARTER_IDS[g]));
- S={board,wild:[],wildPool,market:[],generations,players:defs.map((d,i)=>{let base=BY_NUMBER[starters[i%starters.length]],st=card(base.name,"pokemon",{types:base.types,score:base.score,rarity:base.rarity});return Object.assign(d,{pos:[6,11,1,16][i],deck:shuffle([ball("Red Ball"),ball("Red Ball"),ball("Red Ball"),st]),discard:[],hand:[],gymBadges:new Set(),badges:0})}),current:0,phase:"move",roll:0,selected:null,battled:false,captured:false,dueled:false,duel:null,winner:null};
- refill();$("#setup").classList.add("hidden");$("#game").classList.remove("hidden");$("#log").innerHTML="";begin();
+ S={board,wild:[],wildPool,market:[],generations,players:defs.map((d,i)=>{let base=BY_NUMBER[starters[i%starters.length]],st=card(base.name,"pokemon",{types:base.types,score:base.score,rarity:base.rarity});return Object.assign(d,{pos:[6,11,1,16][i],deck:shuffle([ball("Red Ball"),ball("Red Ball"),ball("Red Ball"),ball("Red Ball"),st]),discard:[],hand:[],gymBadges:new Set(),badges:0})}),current:0,phase:"move",roll:0,selected:null,battled:false,captured:false,dueled:false,duel:null,winner:null};
+ S.players.forEach(drawToFive);refill();$("#setup").classList.add("hidden");$("#game").classList.remove("hidden");$("#log").innerHTML="";begin();
 }
 function begin(){let p=current();S.phase="move";S.roll=0;S.selected=null;S.battled=false;S.captured=false;S.dueled=false;S.duel=null;drawToFive(p);log("▶ "+p.name+(p.ai?" [AI]":"")+" begint.");render();if(p.ai)setTimeout(aiTurn,400)}
 function typeMultiplier(a,b){let adv=a.types.some(t=>(ADV[t]||[]).some(x=>b.types.includes(x)));let disadv=b.types.some(t=>(ADV[t]||[]).some(x=>a.types.includes(x)));if(adv&&!disadv)return 2;if(disadv&&!adv)return .5;return 1}
@@ -280,10 +280,11 @@ function battle(gym,p){
  let a=combatPower(mine,foe,true), f=combatPower(foe,mine,false), foePower=f.value*(gym?2:1);
  let reason=a.terrain===2?"zonebonus "+S.board[p.pos]+" ×2":a.type===2?"typevoordeel ×2":a.type===.5?"typenadeel ×½":"neutraal";
  log("⚔️ "+mine.name+": "+mine.score+" → "+a.value+" ("+reason+") vs "+foe.name+": "+foePower+(gym?" (Gym ×2)":"")+".");
- if(a.value>=foePower){if(gym){p.gymBadges.add(p.pos);p.badges=p.gymBadges.size;log("🏅 "+p.name+" wint de badge van gym "+(p.pos+1)+" ("+p.badges+"/6).");if(p.badges===6){S.winner=p;S.phase="won";log("🎉 "+p.name+" wint Pokéboard met zes badges!")}}else{let r=foe.rarity==="Rare"?"Silver":"Copper";p.discard.push(coin(r));log("🏆 "+p.name+" wint een "+r+" Coin.")}}else log("💥 "+p.name+" verliest.");
+ if(a.value>=foePower){if(gym){p.gymBadges.add(p.pos);p.badges=p.gymBadges.size;log("🏅 "+p.name+" wint de badge van gym "+(p.pos+1)+" ("+p.badges+"/6).");if(p.badges===6){S.winner=p;S.phase="won";log("🎉 "+p.name+" wint Pokéboard met zes badges!")}}else{let r=foe.rarity==="Common"?"Copper":"Silver";p.discard.push(coin(r));log("🏆 "+p.name+" wint een "+r+" Coin voor een "+foe.rarity+" Pokémon.")}}else log("💥 "+p.name+" verliest.");
  render();return true;
 }
 function duelTargets(){let p=current();return S.players.map((x,i)=>i).filter(i=>i!==S.current&&S.players[i].pos===p.pos&&hasPokemon(S.players[i]))}
+function duelAvailability(){let p=current(),others=S.players.filter((x,i)=>i!==S.current&&x.pos===p.pos);if(S.dueled)return"Je hebt deze beurt al een trainerduel gevochten.";if(!hasPokemon(p))return"Je hebt een Pokémon in je hand nodig voor een trainerduel.";if(!others.length)return"Land op hetzelfde vakje als een andere trainer om hem uit te dagen.";if(!others.some(hasPokemon))return"De trainer op dit vakje heeft momenteel geen Pokémon in zijn hand.";return"Trainer op jouw vakje: klik op Trainerduel om uit te dagen."}
 function startDuel(target){
  let p=current(),pi=chosenIndex(p),targets=duelTargets();
  if(S.winner||S.phase!=="action"||S.dueled||pi<0||!targets.length)return false;
@@ -316,18 +317,18 @@ function resolveDuel(di){
 function cancelDuel(){if(S.phase!=="duel"||!S.duel)return;S.duel=null;S.phase="action";render();if(current().ai)setTimeout(aiWrapup,350)}
 function capture(i,p){p=p||current();let pk=S.market[i];if(!pk||!pk.types.includes(S.board[p.pos]))return false;let bi=-1;for(let j=0;j<p.hand.length;j++)if(p.hand[j].kind==="ball"&&canCatch(p.hand[j].name,pk.rarity)&&(bi<0||BALL_ORDER[p.hand[j].name]<BALL_ORDER[p.hand[bi].name]))bi=j;if(bi<0)return false;let used=p.hand.splice(bi,1)[0];p.discard.push(Object.assign({},pk,{id:"caught"+Math.random()}));S.market.splice(i,1);S.captured=true;refill();log("✨ "+p.name+" vangt "+pk.name+" met "+used.name+".");render();return true}
 function buy(k,p){p=p||current();let i=p.hand.findIndex(c=>c.kind==="coin"&&c.name===k);if(i<0)return false;p.hand.splice(i,1);let b=k==="Copper"?"Red Ball":k==="Silver"?"Blue Ball":"Yellow Ball";p.discard.push(ball(b));log("🛒 "+p.name+" koopt "+b+".");render();return true}
-function finish(){if(!S||!["action","shop"].includes(S.phase))return;let p=current();p.discard.push(...p.hand);p.hand=[];log("⏹ "+p.name+" beëindigt de beurt.");S.current=(S.current+1)%S.players.length;begin()}
+function finish(){if(!S||!["action","shop"].includes(S.phase))return;let p=current();p.discard.push(...p.hand);p.hand=[];drawToFive(p);log("⏹ "+p.name+" beëindigt de beurt en trekt "+p.hand.length+" nieuwe kaarten voor de volgende ronde en verdediging.");S.current=(S.current+1)%S.players.length;begin()}
 function aiTurn(){
  if(!S||S.winner||!current().ai)return;let p=current();S.roll=1+Math.floor(Math.random()*6);log("🎲 "+p.name+" [AI] gooit "+S.roll+".");
  let ds=S.board.map((_,i)=>i).filter(i=>distance(p.pos,i)>=1&&distance(p.pos,i)<=S.roll);
- function score(i){let z=S.board[i],s=Math.random();if(S.market.some(pk=>pk.types.includes(z)&&p.hand.some(c=>c.kind==="ball"&&canCatch(c.name,pk.rarity))))s+=10;if(GYMS.has(i)&&!p.gymBadges.has(i)&&hasPokemon(p))s+=14;if(S.players.some(x=>x!==p&&x.pos===i&&hasPokemon(x))&&hasPokemon(p))s+=5;return s}
+ function score(i){let z=S.board[i],s=Math.random();if(S.market.some(pk=>pk.types.includes(z)&&p.hand.some(c=>c.kind==="ball"&&canCatch(c.name,pk.rarity))))s+=10;if(GYMS.has(i)&&!p.gymBadges.has(i)&&hasPokemon(p))s+=14;if(S.players.some(x=>x!==p&&x.pos===i&&hasPokemon(x))&&hasPokemon(p))s+=30;return s}
  ds.sort((a,b)=>score(b)-score(a));if(ds.length)p.pos=ds[0];S.phase="action";log("📍 "+p.name+" [AI] → "+S.board[p.pos]+".");
  let mi=S.market.findIndex(pk=>pk.types.includes(S.board[p.pos])&&p.hand.some(c=>c.kind==="ball"&&canCatch(c.name,pk.rarity)));if(mi>=0)capture(mi,p);
  for(let name of Object.keys(EVOLVE))while(availableEvolutions(name).length&&countOwned(p,name,"pokemon")>=2)evolve(name,p,availableEvolutions(name)[0]);
+ let targets=duelTargets();if(targets.length&&hasPokemon(p)&&startDuel(targets[0]))return;
  if(hasPokemon(p)&&GYMS.has(p.pos)&&!p.gymBadges.has(p.pos))battle(true,p);
  if(S.winner)return;
- let targets=duelTargets();if(targets.length&&hasPokemon(p)&&startDuel(targets[0]))return;
- if(hasPokemon(p))battle(false,p);
+ if(p.hand.filter(c=>c.kind==="pokemon").length>1)battle(false,p);
  aiWrapup();
 }
 function aiWrapup(){
@@ -345,7 +346,7 @@ function render(){
  let hand=$("#hand");hand.innerHTML="";p.hand.forEach((c,i)=>{let b=document.createElement("button");b.type="button";b.className="card "+(S.selected===i?"selected":"")+(c.kind==="pokemon"?" pokemon-card":c.kind==="coin"?" item-card coin-card":" item-card");b.disabled=p.ai||S.phase==="duel"||c.kind!=="pokemon";b.dataset.hand=i;if(c.kind==="pokemon"){stylePokemonCard(b,c);b.innerHTML=pokemonCardHtml(c)}else b.innerHTML='<span class="item-symbol">'+(c.kind==="coin"?"🪙":"◉")+'</span><span class="card-name">'+c.name+'</span><span class="item-kind">'+(c.kind==="coin"?"munt":"Poké Ball")+'</span>';hand.appendChild(b)});
  let market=$("#market");market.innerHTML="";S.market.forEach((pk,i)=>{let b=document.createElement("button");b.type="button";b.className="card pokemon-card";b.disabled=p.ai||S.phase!=="action"||S.captured;b.dataset.market=i;stylePokemonCard(b,pk);b.innerHTML=pokemonCardHtml(pk);market.appendChild(b)});
  let evolutions=$("#evolutions");evolutions.innerHTML="";for(let name of Object.keys(EVOLVE))if(countOwned(p,name,"pokemon")>=2)for(let next of availableEvolutions(name)){let b=document.createElement("button");b.type="button";b.dataset.evolve=name;b.dataset.next=next;b.textContent="2 × "+name+" → "+next;b.disabled=p.ai||!["action","shop"].includes(S.phase);evolutions.appendChild(b)}if(!evolutions.children.length)evolutions.textContent="Nog geen dubbel paar beschikbaar.";
- let human=!p.ai;$("#roll").disabled=!human||S.phase!=="move";$("#wild").disabled=!human||S.phase!=="action"||S.battled||!hasPokemon(p);$("#gym").disabled=!human||S.phase!=="action"||S.battled||!hasPokemon(p)||!GYMS.has(p.pos)||p.gymBadges.has(p.pos);$("#duel").disabled=!human||S.phase!=="action"||S.dueled||!hasPokemon(p)||!duelTargets().length;$("#shop").disabled=!human||S.phase!=="action";$("#end").disabled=!human||!["action","shop"].includes(S.phase);$("#shopPanel").classList.toggle("hidden",S.phase!=="shop");
+ let human=!p.ai;$("#roll").disabled=!human||S.phase!=="move";$("#wild").disabled=!human||S.phase!=="action"||S.battled||!hasPokemon(p);$("#gym").disabled=!human||S.phase!=="action"||S.battled||!hasPokemon(p)||!GYMS.has(p.pos)||p.gymBadges.has(p.pos);$("#duel").disabled=!human||S.phase!=="action"||S.dueled||!hasPokemon(p);$("#duelStatus").textContent=human&&S.phase==="action"?duelAvailability():"";$("#shop").disabled=!human||S.phase!=="action";$("#end").disabled=!human||!["action","shop"].includes(S.phase);$("#shopPanel").classList.toggle("hidden",S.phase!=="shop");
  let duelPanel=$("#duelPanel"),choices=$("#duelChoices");duelPanel.classList.toggle("hidden",S.phase!=="duel");choices.innerHTML="";
  if(S.phase==="duel"&&S.duel){let d=S.duel,prompt=$("#duelPrompt");if(d.stage==="target"){prompt.textContent="Kies een trainer op jouw vakje.";for(let i of d.targets){let b=document.createElement("button");b.type="button";b.dataset.duelTarget=i;b.textContent=S.players[i].name;choices.appendChild(b)}}else{let foe=S.players[d.defender];prompt.textContent=foe.name+": kies een Pokémon om te verdedigen.";foe.hand.forEach((c,i)=>{if(c.kind!=="pokemon")return;let b=document.createElement("button");b.type="button";b.dataset.duelPick=i;b.textContent=c.name+" · kracht "+c.score;choices.appendChild(b)})}$("#duelCancel").disabled=p.ai}
  for(let b of $("#shopPanel").querySelectorAll("[data-exchange]"))b.disabled=!human||S.phase!=="shop"||p.hand.filter(c=>c.kind==="coin"&&c.name===b.dataset.exchange).length<(b.dataset.exchange==="Copper"?3:2);
@@ -358,7 +359,7 @@ $("#board").addEventListener("click",e=>{let b=e.target.closest("[data-tile]");i
 $("#hand").addEventListener("click",e=>{let b=e.target.closest("[data-hand]");if(b){S.selected=Number(b.dataset.hand);render()}});
 $("#market").addEventListener("click",e=>{let b=e.target.closest("[data-market]");if(b)capture(Number(b.dataset.market))});
 $("#evolutions").addEventListener("click",e=>{let b=e.target.closest("[data-evolve]");if(b&&!b.disabled&&["action","shop"].includes(S.phase))evolve(b.dataset.evolve,null,b.dataset.next)});
-$("#wild").addEventListener("click",()=>battle(false));$("#gym").addEventListener("click",()=>battle(true));$("#duel").addEventListener("click",()=>startDuel());$("#duelChoices").addEventListener("click",e=>{let b=e.target.closest("[data-duel-target], [data-duel-pick]");if(!b||b.disabled)return;if(b.dataset.duelTarget!==undefined)chooseDuelTarget(Number(b.dataset.duelTarget));else resolveDuel(Number(b.dataset.duelPick))});$("#duelCancel").addEventListener("click",cancelDuel);$("#shop").addEventListener("click",()=>{S.phase="shop";render()});$("#end").addEventListener("click",finish);
+$("#wild").addEventListener("click",()=>battle(false));$("#gym").addEventListener("click",()=>battle(true));$("#duel").addEventListener("click",()=>{if(!startDuel())log("🥊 "+duelAvailability())});$("#duelChoices").addEventListener("click",e=>{let b=e.target.closest("[data-duel-target], [data-duel-pick]");if(!b||b.disabled)return;if(b.dataset.duelTarget!==undefined)chooseDuelTarget(Number(b.dataset.duelTarget));else resolveDuel(Number(b.dataset.duelPick))});$("#duelCancel").addEventListener("click",cancelDuel);$("#shop").addEventListener("click",()=>{S.phase="shop";render()});$("#end").addEventListener("click",finish);
 $("#shopPanel").addEventListener("click",e=>{let b=e.target.closest("[data-buy], [data-exchange]");if(b&&!b.disabled&&S.phase==="shop"){if(b.dataset.buy)buy(b.dataset.buy);else exchange(b.dataset.exchange)}});
 document.addEventListener("error",e=>{if(e.target.matches?.(".card-art img"))e.target.remove()},true);
 setupRows();setupGenerations();
