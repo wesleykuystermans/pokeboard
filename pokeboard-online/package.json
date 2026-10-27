@@ -1,0 +1,18 @@
+{
+ "name": "pokeboard-online",
+ "private": true,
+ "type": "module",
+ "scripts": {
+  "dev": "wrangler dev",
+  "test": "node --test test/*.test.mjs",
+  "test:runtime": "node test/runtime-smoke.mjs",
+  "test:client": "node test/client-smoke.mjs",
+  "deploy": "wrangler deploy",
+  "check": "wrangler deploy --dry-run"
+ },
+ "devDependencies": {
+  "jsdom": "^30.1.3",
+  "miniflare": "5.20261019.2-beta",
+  "wrangler": "^4.0.0"
+ }
+}
